@@ -10,7 +10,7 @@
 # Vast.ai RTX 3090 machines are linux/amd64.
 # Do not push an arm64 image from Apple Silicon for this tag.
 
-FROM --platform=linux/amd64 nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
