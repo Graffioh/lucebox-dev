@@ -1,0 +1,4 @@
+[submodule "lucebox-hub"]
+	path = lucebox-hub
+	url = https://github.com/Graffioh/lucebox-hub.git
+	branch = main
