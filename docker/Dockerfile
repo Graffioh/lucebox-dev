@@ -13,7 +13,7 @@
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
+ENV TZ=Europe/Rome
 
 # Core system dependencies for Lucebox/DFlash development.
 RUN apt-get update && apt-get install -y --no-install-recommends \
