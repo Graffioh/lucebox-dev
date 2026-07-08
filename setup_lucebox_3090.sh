@@ -12,6 +12,7 @@ set -euo pipefail
 #
 #   lucebox-dev/
 #   ├── lucebox-hub/          # git submodule
+#   │   └── server/           # DFlash CMake project
 #   ├── .gitmodules
 #   ├── docker/Dockerfile
 #   └── setup_lucebox_3090.sh
@@ -30,6 +31,7 @@ set -euo pipefail
 
 DEV_REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LUCEBOX_DIR="$DEV_REPO_DIR/lucebox-hub"
+DFLASH_DIR="$LUCEBOX_DIR/server"
 
 # Keep large files outside the repo.
 # Default: sibling directory next to lucebox-dev.
@@ -43,7 +45,7 @@ TARGET_REPO="${TARGET_REPO:-unsloth/Qwen3.6-27B-GGUF}"
 TARGET_FILE="${TARGET_FILE:-Qwen3.6-27B-Q4_K_M.gguf}"
 
 DRAFT_REPO="${DRAFT_REPO:-Lucebox/Qwen3.6-27B-DFlash-GGUF}"
-DRAFT_FILE="${DRAFT_FILE:-dflash-draft-3.6-q8_0.gguf}"
+DRAFT_FILE="${DRAFT_FILE:-dflash-draft-3.6-q4_k_m.gguf}"
 
 GIT_USER_NAME="${GIT_USER_NAME:-Graffioh}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-}"
@@ -59,6 +61,7 @@ echo "Lucebox Dev Setup"
 echo "============================================================"
 echo "DEV_REPO_DIR:        $DEV_REPO_DIR"
 echo "LUCEBOX_DIR:         $LUCEBOX_DIR"
+echo "DFLASH_DIR:          $DFLASH_DIR"
 echo "WORK_ROOT:           $WORK_ROOT"
 echo "MODEL_DIR:           $MODEL_DIR"
 echo "HF_HOME:             $HF_HOME"
@@ -159,6 +162,12 @@ if [ ! -d "$LUCEBOX_DIR" ]; then
   exit 1
 fi
 
+if [ ! -f "$DFLASH_DIR/CMakeLists.txt" ]; then
+  echo "ERROR: DFlash CMake project not found at $DFLASH_DIR"
+  echo "The current lucebox-hub layout is expected to contain server/CMakeLists.txt."
+  exit 1
+fi
+
 echo
 echo "== Create model/cache directories =="
 mkdir -p "$MODEL_DIR/draft"
@@ -166,7 +175,7 @@ mkdir -p "$HF_HOME"
 
 echo
 echo "== Build DFlash for CUDA arch $CUDA_ARCH =="
-cd "$LUCEBOX_DIR/dflash"
+cd "$DFLASH_DIR"
 
 cmake -B build -S . \
   -DCMAKE_BUILD_TYPE=Release \
@@ -191,18 +200,18 @@ else
 fi
 
 echo
-echo "== Symlink models into lucebox-hub/dflash/models =="
-mkdir -p "$LUCEBOX_DIR/dflash/models/draft"
+echo "== Symlink models into lucebox-hub/server/models =="
+mkdir -p "$DFLASH_DIR/models/draft"
 
 ln -sf "$MODEL_DIR/$TARGET_FILE" \
-  "$LUCEBOX_DIR/dflash/models/$TARGET_FILE"
+  "$DFLASH_DIR/models/$TARGET_FILE"
 
 ln -sf "$MODEL_DIR/draft/$DRAFT_FILE" \
-  "$LUCEBOX_DIR/dflash/models/draft/$DRAFT_FILE"
+  "$DFLASH_DIR/models/draft/$DRAFT_FILE"
 
 echo
 echo "== Smoke test =="
-cd "$LUCEBOX_DIR/dflash"
+cd "$DFLASH_DIR"
 
 python3 scripts/run.py --prompt "def fibonacci(n):"
 
@@ -212,6 +221,7 @@ echo "Done."
 echo "============================================================"
 echo "Dev repo:     $DEV_REPO_DIR"
 echo "Lucebox repo: $LUCEBOX_DIR"
+echo "DFlash dir:   $DFLASH_DIR"
 echo "Models:       $MODEL_DIR"
 echo
 echo "Useful commands:"
@@ -224,7 +234,7 @@ echo "  cd $DEV_REPO_DIR"
 echo "  bash setup_lucebox_3090.sh"
 echo
 echo "  # Fast dev loop"
-echo "  cd $LUCEBOX_DIR/dflash"
+echo "  cd $DFLASH_DIR"
 echo "  cmake --build build --target test_dflash -j\"\$(nproc)\""
 echo "  python3 scripts/run.py --prompt \"Explain speculative decoding briefly.\""
 echo
