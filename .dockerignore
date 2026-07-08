@@ -1,0 +1,16 @@
+.git
+.gitmodules
+lucebox-hub
+models
+.cache
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.onnx
+*.tar
+*.zip
+__pycache__
+.venv
+build
