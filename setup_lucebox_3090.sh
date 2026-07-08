@@ -40,6 +40,7 @@ MODEL_DIR="${MODEL_DIR:-$WORK_ROOT/models}"
 HF_HOME="${HF_HOME:-$WORK_ROOT/.cache/huggingface}"
 
 CUDA_ARCH="${CUDA_ARCH:-86}"   # RTX 3090 = sm_86
+BUILD_JOBS="${BUILD_JOBS:-$(nproc)}"
 
 TARGET_REPO="${TARGET_REPO:-unsloth/Qwen3.6-27B-GGUF}"
 TARGET_FILE="${TARGET_FILE:-Qwen3.6-27B-Q4_K_M.gguf}"
@@ -66,6 +67,7 @@ echo "WORK_ROOT:           $WORK_ROOT"
 echo "MODEL_DIR:           $MODEL_DIR"
 echo "HF_HOME:             $HF_HOME"
 echo "CUDA_ARCH:           $CUDA_ARCH"
+echo "BUILD_JOBS:          $BUILD_JOBS"
 echo "INSTALL_SYSTEM_DEPS: $INSTALL_SYSTEM_DEPS"
 echo "INSTALL_PYTHON_TOOLS:$INSTALL_PYTHON_TOOLS"
 echo
@@ -169,6 +171,12 @@ if [ ! -f "$DFLASH_DIR/CMakeLists.txt" ]; then
 fi
 
 echo
+echo "== Sync Python workspace dependencies =="
+cd "$LUCEBOX_DIR"
+read -r -a UV_SYNC_ARGS <<< "${UV_SYNC_ARGS:---no-install-package torch}"
+uv sync --frozen "${UV_SYNC_ARGS[@]}"
+
+echo
 echo "== Create model/cache directories =="
 mkdir -p "$MODEL_DIR/draft"
 mkdir -p "$HF_HOME"
@@ -181,7 +189,7 @@ cmake -B build -S . \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH"
 
-cmake --build build --target test_dflash -j"$(nproc)"
+cmake --build build --target test_dflash dflash_server -j"$BUILD_JOBS"
 
 echo
 echo "== Download target GGUF if missing =="
@@ -213,7 +221,7 @@ echo
 echo "== Smoke test =="
 cd "$DFLASH_DIR"
 
-python3 scripts/run.py --prompt "def fibonacci(n):"
+uv run --frozen --no-sync python scripts/run.py --prompt "def fibonacci(n):"
 
 echo
 echo "============================================================"
@@ -232,11 +240,16 @@ echo
 echo "  # Re-run setup"
 echo "  cd $DEV_REPO_DIR"
 echo "  bash setup_lucebox_3090.sh"
+echo "  BUILD_JOBS=8 bash setup_lucebox_3090.sh"
 echo
 echo "  # Fast dev loop"
 echo "  cd $DFLASH_DIR"
-echo "  cmake --build build --target test_dflash -j\"\$(nproc)\""
-echo "  python3 scripts/run.py --prompt \"Explain speculative decoding briefly.\""
+echo "  cmake --build build --target test_dflash dflash_server -j\"$BUILD_JOBS\""
+echo "  uv run --frozen --no-sync python scripts/run.py --prompt \"Explain speculative decoding briefly.\""
+echo
+echo "  # Start the OpenAI-compatible server"
+echo "  DFLASH27B_KV_TQ3=1 ./build/dflash_server models/$TARGET_FILE \\"
+echo "    --draft models/draft/$DRAFT_FILE --ddtree --ddtree-budget 22 --fa-window 2048 --port 8000"
 echo
 echo "  # If using a non-custom image"
 echo "  INSTALL_SYSTEM_DEPS=1 INSTALL_PYTHON_TOOLS=1 bash setup_lucebox_3090.sh"
