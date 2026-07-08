@@ -13,8 +13,7 @@ set -euo pipefail
 #   lucebox-dev/
 #   ├── lucebox-hub/          # git submodule
 #   ├── .gitmodules
-#   ├── docker/
-#   │   └── Dockerfile
+#   ├── Dockerfile
 #   └── setup_lucebox_3090.sh
 #
 # Run from inside lucebox-dev:
@@ -86,7 +85,7 @@ if [ "$INSTALL_SYSTEM_DEPS" = "1" ]; then
     git git-lfs gh curl wget ca-certificates \
     build-essential cmake ninja-build pkg-config \
     python3 python3-pip python3-venv python3-dev \
-    gdb lldb vim nano tmux htop less ripgrep fd-find jq unzip zip rsync \
+    gdb lldb vim htop less ripgrep fd-find jq unzip zip rsync \
     openssh-client sudo
 else
   echo "== Skipping system package install =="

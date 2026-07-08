@@ -1,4 +1,16 @@
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+# Build for Vast.ai / NVIDIA GPU cloud machines with:
+#
+# docker buildx build \
+#   --platform linux/amd64 \
+#   -f docker/Dockerfile \
+#   -t graffioh/lucebox-dev:cuda12.4-ubuntu22.04-amd64 \
+#   --push \
+#   .
+#
+# Vast.ai RTX 3090 machines are linux/amd64.
+# Do not push an arm64 image from Apple Silicon for this tag.
+
+FROM --platform=linux/amd64 nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -22,8 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gdb \
     lldb \
     vim \
-    nano \
-    tmux \
     htop \
     less \
     ripgrep \
@@ -58,5 +68,4 @@ ENV HF_HOME=/workspace/.cache/huggingface
 
 WORKDIR /workspace
 
-# Keep container alive by default on Vast/interactive systems.
 CMD ["/bin/bash"]
