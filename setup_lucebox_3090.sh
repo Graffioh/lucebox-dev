@@ -13,7 +13,7 @@ set -euo pipefail
 #   lucebox-dev/
 #   ├── lucebox-hub/          # git submodule
 #   ├── .gitmodules
-#   ├── Dockerfile
+#   ├── docker/Dockerfile
 #   └── setup_lucebox_3090.sh
 #
 # Run from inside lucebox-dev:
