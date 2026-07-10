@@ -26,13 +26,32 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push linux/amd64 image
+      - name: Build and push 3090 image (sm_86)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64
           push: true
+          build-args: |
+            CUDA_ARCH=86
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             graffioh/lucebox-dev:cuda12.4-ubuntu22.04-amd64
+            graffioh/lucebox-dev:cuda12.4-ubuntu22.04-3090-amd64
             graffioh/lucebox-dev:latest-amd64
+
+      - name: Build and push H200 image (sm_90)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            CUDA_ARCH=90
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            graffioh/lucebox-dev:cuda12.4-ubuntu22.04-h200-amd64

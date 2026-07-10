@@ -3,12 +3,17 @@
 # docker buildx build \
 #   --platform linux/amd64 \
 #   -f docker/Dockerfile \
+#   --build-arg CUDA_ARCH=86 \
 #   -t graffioh/lucebox-dev:cuda12.4-ubuntu22.04-amd64 \
 #   --push \
 #   .
 #
-# Vast.ai RTX 3090 machines are linux/amd64.
-# Do not push an arm64 image from Apple Silicon for this tag.
+# CUDA_ARCH picks the target GPU: 86 = RTX 3090 (default), 90 = H200.
+# For the H200 image use --build-arg CUDA_ARCH=90 and tag
+# graffioh/lucebox-dev:cuda12.4-ubuntu22.04-h200-amd64.
+#
+# Vast.ai machines are linux/amd64.
+# Do not push an arm64 image from Apple Silicon for these tags.
 
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
@@ -58,11 +63,13 @@ RUN git lfs install --system
 # Convenience symlink: Ubuntu package calls it fdfind.
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd || true
 
-# Default env for RTX 3090.
+# Default env for the target GPU (86 = RTX 3090, 90 = H200).
+# Declared late so both images share every layer above.
+ARG CUDA_ARCH=86
 ENV INSTALL_SYSTEM_DEPS=0
 ENV INSTALL_PYTHON_TOOLS=0
-ENV CUDA_ARCH=86
-ENV CMAKE_CUDA_ARCHITECTURES=86
+ENV CUDA_ARCH=${CUDA_ARCH}
+ENV CMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH}
 ENV WORK_ROOT=/workspace
 ENV HF_HOME=/workspace/.cache/huggingface
 
