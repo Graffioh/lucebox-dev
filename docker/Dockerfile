@@ -75,4 +75,7 @@ ENV HF_HOME=/workspace/.cache/huggingface
 
 WORKDIR /workspace
 
-CMD ["/bin/bash"]
+# Keep development containers alive when a platform launches the image without
+# an interactive TTY. Cloud runtimes can still override this command to start a
+# service, and local interactive use remains available with `docker run ... /bin/bash`.
+CMD ["sleep", "infinity"]
