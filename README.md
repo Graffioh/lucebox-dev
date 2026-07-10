@@ -7,7 +7,7 @@ it contains:
    - `graffioh/lucebox-dev:cuda12.4-ubuntu22.04-h200-amd64` — H200 / sm_90
 2) setup scripts to run when ssh'd into the GPU (as documented in lucebox-hub README):
    - `setup_qwen_dflash_3090.sh` — qwen target + dflash draft (RTX 3090)
-   - `setup_deepseek_v4flash_h200.sh` — deepseek v4 flash target-only, ~102 GB (H200)
+   - `setup_deepseek_v4flash_h200.sh` — DeepSeek V4 Flash antirez Q2 target-only, ~80.8 GiB (H200)
    - `setup_common.sh` — shared steps sourced by both, not run directly
 
 just a way to simply reproduce the setup actions when i spin up a new gpu instance

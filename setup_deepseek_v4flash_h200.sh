@@ -5,8 +5,8 @@ set -euo pipefail
 # Lucebox DeepSeek V4 Flash dev setup for Vast.ai H200
 # (target-only, no DFlash draft)
 #
-# Downloads the DeepSeek V4 Flash target GGUF (~102 GB) for
-# lucebox-hub's deepseek4 backend and builds DFlash.
+# Downloads antirez's DeepSeek V4 Flash Q2 target GGUF (~80.8 GiB /
+# 86.7 GB) for lucebox-hub's CUDA deepseek4 backend and builds DFlash.
 #
 # Defaults to CUDA_ARCH=90 (H200 = sm_90). For a different GPU,
 # override the arch:
@@ -19,6 +19,12 @@ set -euo pipefail
 #
 # Run from inside lucebox-dev:
 #
+#   bash setup_deepseek_v4flash_h200.sh
+#
+# To override the model (for example, for the AMD ROCMFPX quantization):
+#
+#   DEEPSEEK_V4_FLASH_REPO=Lucebox/DeepSeek-V4-Flash-ROCMFPX \
+#   DEEPSEEK_V4_FLASH_FILE=DeepSeek-V4-Flash-ROCMFP2-STRIX.gguf \
 #   bash setup_deepseek_v4flash_h200.sh
 #
 # On a vanilla image where deps are not preinstalled:
@@ -44,8 +50,8 @@ case "${1:-}" in
     ;;
 esac
 
-DEEPSEEK_V4_FLASH_REPO="${DEEPSEEK_V4_FLASH_REPO:-Lucebox/DeepSeek-V4-Flash-ROCMFPX}"
-DEEPSEEK_V4_FLASH_FILE="${DEEPSEEK_V4_FLASH_FILE:-DeepSeek-V4-Flash-ROCMFP2-STRIX.gguf}"
+DEEPSEEK_V4_FLASH_REPO="${DEEPSEEK_V4_FLASH_REPO:-antirez/deepseek-v4-gguf}"
+DEEPSEEK_V4_FLASH_FILE="${DEEPSEEK_V4_FLASH_FILE:-DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AProjQ8-SExpQ8-OutQ8-chat-v2.gguf}"
 DEEPSEEK_V4_FLASH_DIR="${DEEPSEEK_V4_FLASH_DIR:-$MODEL_DIR/deepseek-v4-flash}"
 
 echo "============================================================"
