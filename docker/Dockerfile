@@ -48,8 +48,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     rsync \
     openssh-client \
+    openssh-server \
     sudo \
     && rm -rf /var/lib/apt/lists/*
+
+# Prime Intellect custom-image prerequisites. Its template start script writes
+# PUBLIC_KEY to /root/.ssh/authorized_keys, sets SSH_PORT, and launches sshd.
+RUN mkdir -p /var/run/sshd /root/.ssh \
+    && chmod 700 /root/.ssh \
+    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
+    && sed -i 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' /etc/pam.d/sshd \
+    && ssh-keygen -A
 
 # Python tools used by the Lucebox docs/setup.
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
