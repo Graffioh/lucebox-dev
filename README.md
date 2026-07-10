@@ -20,6 +20,21 @@ just a way to simply reproduce the setup actions when i spin up a new gpu instan
 4) `bash setup_qwen_dflash_3090.sh` (or `bash setup_deepseek_v4flash_h200.sh` for deepseek)
 5) start lucebox server:
 
+For DeepSeek V4 Flash on an H200, build and start it from the `lucebox-dev`
+directory with:
+
+```sh
+bash run_deepseek_v4flash.sh --gpu h200
+```
+
+To build with symbols and start it under GDB (the server runs immediately), use:
+
+```sh
+bash run_deepseek_v4flash.sh --gpu h200 --debug
+```
+
+After a crash, enter `bt full` or `thread apply all bt full` at the GDB prompt.
+
 e.g. 
 
 ```sh
