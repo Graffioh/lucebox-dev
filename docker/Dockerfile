@@ -4,7 +4,7 @@
 #   --platform linux/amd64 \
 #   -f docker/Dockerfile \
 #   --build-arg CUDA_ARCH=86 \
-#   -t graffioh/lucebox-dev:cuda12.4-ubuntu22.04-amd64 \
+#   -t graffioh/lucebox-dev:cuda12.4-ubuntu22.04-3090-amd64 \
 #   --push \
 #   .
 #

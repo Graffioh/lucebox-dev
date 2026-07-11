@@ -1,65 +1,177 @@
-# Lucebox berto dev environment
+# Lucebox GPU development environment
 
-it contains:
+Reproducible CUDA development environment for `lucebox-hub`.
 
-1) github action to push custom images on docker hub (one Dockerfile, `CUDA_ARCH` build-arg picks the GPU), to run lucebox-hub on vast.ai:
-   - `graffioh/lucebox-dev:cuda12.4-ubuntu22.04-amd64` — RTX 3090 / sm_86 (also tagged `-3090-amd64`)
-   - `graffioh/lucebox-dev:cuda12.4-ubuntu22.04-h200-amd64` — H200 / sm_90
-2) setup scripts to run when ssh'd into the GPU (as documented in lucebox-hub README):
-   - `setup_qwen_dflash_3090.sh` — qwen target + dflash draft (RTX 3090)
-   - `setup_deepseek_v4flash_h200.sh` — DeepSeek V4 Flash antirez Q2 target-only, ~80.8 GiB (H200)
-   - `setup_common.sh` — shared steps sourced by both, not run directly
+## Supported images
 
-just a way to simply reproduce the setup actions when i spin up a new gpu instance
+| GPU | CUDA arch | Docker image |
+| --- | ---: | --- |
+| RTX 3090 | `sm_86` | `graffioh/lucebox-dev:cuda12.4-ubuntu22.04-3090-amd64` |
+| H200 | `sm_90` | `graffioh/lucebox-dev:cuda12.4-ubuntu22.04-h200-amd64` |
 
-## Steps
+## First setup
 
-1) spend money on a 3090 (qwen) or H200 (deepseek) -> [vast.ai](https://vast.ai)
-2) ssh into it
-3) `git clone --recurse-submodules https://github.com/Graffioh/lucebox-dev.git`
-4) `bash setup_qwen_dflash_3090.sh` (or `bash setup_deepseek_v4flash_h200.sh` for deepseek)
-5) start lucebox server:
-
-For DeepSeek V4 Flash on an H200, build and start it from the `lucebox-dev`
-directory with:
-
-```sh
-bash run_deepseek_v4flash.sh --gpu h200
+```bash
+git clone --recurse-submodules https://github.com/Graffioh/lucebox-dev.git
+cd lucebox-dev
+bash dev_lucebox.sh doctor
 ```
 
-To build with symbols and start it under GDB (the server runs immediately), use:
+Download or link the desired GGUF under `lucebox-hub/server/models`. For the
+default DeepSeek V4 Flash H200 workflow:
 
-```sh
-bash run_deepseek_v4flash.sh --gpu h200 --debug
+```bash
+mkdir -p lucebox-hub/server/models/deepseek-v4-flash
+
+hf download antirez/deepseek-v4-gguf \
+  DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AProjQ8-SExpQ8-OutQ8-chat-v2.gguf \
+  --local-dir lucebox-hub/server/models/deepseek-v4-flash
+
+bash dev_lucebox.sh build
 ```
 
-After a crash, enter `bt full` or `thread apply all bt full` at the GDB prompt.
+For another model, pass its path with `dev_lucebox.sh run --model PATH`.
 
-e.g. 
+## Daily workflow
 
-```sh
-DFLASH27B_KV_TQ3=1 \
-./lucebox-hub/server/build/dflash_server lucebox-hub/server/models/Qwen3.6-27B-Q4_K_M.gguf \
-  --draft lucebox-hub/server/models/draft/dflash-draft-3.6-q4_k_m.gguf \
-  --ddtree \
-  --ddtree-budget 22 \
-  --fa-window 2048 \
+Use `dev_lucebox.sh` after the initial setup. Run every command from `/lucebox-dev`.
+
+```bash
+bash dev_lucebox.sh doctor
+```
+
+(This reports the GPU and compute capability, CUDA arch, required tools, Git
+branch/remotes/dirty state, storage, and model path.)
+
+### Switch to a remote branch (optional)
+
+```bash
+bash dev_lucebox.sh switch \
+  --remote origin \
+  --branch codex/fix-ds4-layer-split-sampling
+```
+
+For upstream branches, configure the remote once:
+
+```bash
+git -C lucebox-hub remote add upstream https://github.com/Luce-Org/lucebox.git
+```
+
+Then:
+
+```bash
+bash dev_lucebox.sh switch \
+  --remote upstream \
+  --branch codex/ds4-rocmfpx-server
+```
+
+### Incremental rebuild
+
+```bash
+bash dev_lucebox.sh build
+```
+
+The default build compiles:
+
+```text
+dflash_server
+test_deepseek4_unit
+```
+
+Useful variants:
+
+```bash
+bash dev_lucebox.sh build --target dflash_server
+bash dev_lucebox.sh build --cuda-arch 90 --jobs 2
+bash dev_lucebox.sh build --debug
+```
+
+Build parallelism defaults to two jobs because CUDA translation units can use
+substantial CPU memory. Override it with `--jobs` or `BUILD_JOBS`.
+
+### Run unit tests (to expand if needed)
+
+```bash
+bash dev_lucebox.sh test
+```
+
+(Right now this incrementally builds and runs `test_deepseek4_unit`)
+
+```bash
+bash dev_lucebox.sh test --no-build # to not rebuild
+```
+
+### Run DeepSeek V4 Flash (to expand to other models)
+
+```bash
+bash dev_lucebox.sh run
+```
+
+`run` rebuilds `dflash_server` incrementally before starting it. Common
+overrides:
+
+```bash
+bash dev_lucebox.sh run \
+  --model /workspace/models/deepseek-v4-flash/model.gguf \
+  --max-ctx 32768 \
   --port 8000
 ```
 
-from a 2nd terminal:
+Pass additional server flags after `--`:
 
-```sh
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "lucebox",
-    "messages": [
-      {"role": "user", "content": "In which city I can eat the best pizza?"}
-    ],
-    "max_tokens": 128,
-    "temperature": 0
-  }'
+```bash
+bash dev_lucebox.sh run -- --target-device cuda:0
 ```
 
-*optionally `gh auth login` to push changes*
+Run a symbolized build under GDB for debugging:
+
+```bash
+bash dev_lucebox.sh run --debug
+```
+
+```gdb
+bt full
+thread apply all bt full
+```
+
+### Update, build, and test
+
+```bash
+bash dev_lucebox.sh update-build-test \
+  --remote origin \
+  --branch codex/fix-ds4-layer-split-sampling
+```
+
+This performs the safe branch switch, incremental server/test build, and unit
+test in one command.
+
+## Test the HTTP server
+
+With the server running, use a second terminal:
+
+```bash
+curl -sS http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "deepseek-v4-flash",
+    "messages": [
+      {"role": "user", "content": "Where the best pizza is made?"}
+    ],
+    "temperature": 0.01,
+    "seed": 42,
+    "max_tokens": 32
+  }' | jq
+```
+
+## Docker image workflow
+
+Normal C++ changes require only `dev_lucebox.sh build`; they do not require a
+new Docker image. Rebuild the image only when changing the toolchain or
+dependencies in `docker/Dockerfile`.
+
+The GitHub workflow publishes both CUDA architectures when the Dockerfile or
+workflow changes. Validate Dockerfile syntax locally with:
+
+```bash
+docker buildx build --check -f docker/Dockerfile .
+```
