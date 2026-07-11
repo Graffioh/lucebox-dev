@@ -74,6 +74,10 @@ fi
 
 run_common_setup
 
+echo
+echo "== Build DeepSeek V4 unit test =="
+cmake --build "$DFLASH_DIR/build" --target test_deepseek4_unit -j"$BUILD_JOBS"
+
 download_if_missing "DeepSeek V4 Flash GGUF" \
   "$DEEPSEEK_V4_FLASH_REPO" "$DEEPSEEK_V4_FLASH_DIR" "$DEEPSEEK_V4_FLASH_FILE"
 

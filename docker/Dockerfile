@@ -60,7 +60,10 @@ RUN mkdir -p /var/run/sshd /root/.ssh \
     && sed -i 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' /etc/pam.d/sshd \
     && ssh-keygen -A
 
-echo 'export PATH=/usr/local/cuda/bin:$PATH' >/etc/profile.d/cuda.sh
+# Preserve the CUDA toolchain path in SSH/login shells as well. Dockerfile
+# shell commands must be part of a RUN instruction.
+RUN echo 'export PATH=/usr/local/cuda/bin:$PATH' > /etc/profile.d/cuda.sh \
+    && chmod 0644 /etc/profile.d/cuda.sh
 
 # Python tools used by the Lucebox docs/setup.
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
