@@ -1,0 +1,124 @@
+##############################################################################
+# DeepSeek4 - comandi di build ed esecuzione
+#   Modalita': 1) Monolithic HIP   2) Layer split CUDA+HIP
+##############################################################################
+
+##############################################################################
+# MODALITA' 1 - MONOLITHIC HIP (Strix Halo, gfx1151)
+##############################################################################
+
+cd ~/lucebox-hub/server
+
+# Modello + drafter DSpark per questa modalita'
+export DS4_MODEL=/opt/models/DeepSeek-V4-Flash-ROCMFP2-STRIX.gguf
+export DS4_DSPARK=/opt/models/DeepSeek-V4-Flash-DSpark-draft-Q4RMFP4-denseF16.gguf
+
+# --- Configure build HIP (ROCm in /opt/rocm) ---
+rm -rf build-hip
+cmake -B build-hip -S . -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DDFLASH27B_GPU_BACKEND=hip \
+  -DDFLASH27B_HIP_ARCHITECTURES=gfx1151 \
+  -DDFLASH27B_HIP_SM80_EQUIV=ON \
+  -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
+  -DCMAKE_HIP_COMPILER_ROCM_ROOT=/opt/rocm \
+  -DROCM_PATH=/opt/rocm
+
+# --- Unit test (nessun modello richiesto) ---
+cmake --build build-hip --target test_deepseek4_unit -j$(nproc)
+./build-hip/test_deepseek4_unit
+#   atteso: "OK" senza righe "FAIL:"
+
+# --- Server monolitico HIP ---
+cmake --build build-hip --target dflash_server -j$(nproc)
+./build-hip/dflash_server $DS4_MODEL \
+  --target-device hip:0 \
+  --ds4-fused-decode \
+  --ds4-expert-top-k 4 \
+  --port 8213
+#   nota: togli "--ds4-expert-top-k 4" per usare i 6 esperti di default (esatto)
+
+# --- Richiesta greedy (temperature 0) ---
+curl -s http://localhost:8213/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  "messages": [{"role":"user","content":"Write a short paragraph about the ocean."}],
+  "temperature": 0,
+  "max_tokens": 256
+}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["choices"][0]["message"]["content"])'
+
+# --- Richiesta sampled (temperature > 0) ---
+curl -s http://localhost:8213/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  "messages": [{"role":"user","content":"Write a short paragraph about the ocean."}],
+  "temperature": 0.7, "top_p": 0.95, "seed": 1,
+  "max_tokens": 256
+}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["choices"][0]["message"]["content"])'
+
+# --- DSpark speculative decoding (opzionale, target monolitico) ---
+export DFLASH_DS4_SPEC=1
+export DFLASH_DS4_DRAFT=$DS4_DSPARK
+export DFLASH_DS4_SPEC_Q=4
+export DFLASH_DS4_FUSED_VERIFY=1   # profilo throughput opt-in (unset = verifier normale)
+./build-hip/dflash_server $DS4_MODEL \
+  --target-device hip:0 \
+  --ds4-fused-decode \
+  --ds4-expert-top-k 4 \
+  --port 8213
+unset DFLASH_DS4_SPEC DFLASH_DS4_DRAFT DFLASH_DS4_SPEC_Q DFLASH_DS4_FUSED_VERIFY
+
+
+##############################################################################
+# MODALITA' 2 - LAYER SPLIT CUDA + HIP (DeepSeek4)
+#   Richiede sullo STESSO host una GPU CUDA + la GPU AMD/HIP.
+#   Il daemon HIP NON si lancia a mano: lo spawna il server CUDA (parent).
+##############################################################################
+
+cd ~/lucebox-hub/server
+
+# Modello per questa modalita'
+export DS4_MODEL=/opt/models/DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AProjQ8-SExpQ8-OutQ8-chat-v2-imatrix.gguf
+
+# --- Build daemon HIP (dalla build HIP configurata nella Modalita' 1) ---
+cmake --build build-hip --target backend_ipc_daemon -j$(nproc)
+
+# --- Configure + build server CUDA (parent/entrypoint) ---
+cmake -B build-cuda -S . -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DDFLASH27B_GPU_BACKEND=cuda
+cmake --build build-cuda --target dflash_server test_deepseek4_unit -j$(nproc)
+
+# --- Unit test lato CUDA ---
+./build-cuda/test_deepseek4_unit
+#   atteso: "OK" senza righe "FAIL:"
+
+# --- Server CUDA (auto-spawn del daemon HIP via --target-shard-ipc-bin) ---
+export DFLASH_DS4_CUDA_LAYERS=24   # split riproducibile: 24 su CUDA, 19 su Halo (auto se unset)
+export DFLASH_DS4_TIMING=1         # banner timing per-token (misura); unset per run normali
+./build-cuda/dflash_server $DS4_MODEL \
+  --target-device cuda:0 \
+  --target-shard-ipc-bin $PWD/build-hip/backend_ipc_daemon \
+  --target-shard-ipc-work-dir $PWD/target_shard_ipc \
+  --port 8213
+#   in alternativa, split esplicito:
+#   ./build-cuda/dflash_server $DS4_MODEL \
+#     --target-devices cuda:0,hip:0 \
+#     --target-layer-split 24,19 \
+#     --target-shard-ipc-bin $PWD/build-hip/backend_ipc_daemon \
+#     --target-shard-ipc-work-dir $PWD/target_shard_ipc \
+#     --port 8213
+
+# --- Richiesta greedy (temperature 0) ---
+curl -s http://localhost:8213/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  "messages": [{"role":"user","content":"Write a short paragraph about the ocean."}],
+  "temperature": 0,
+  "max_tokens": 256
+}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["choices"][0]["message"]["content"])'
+
+# --- Richiesta sampled (temperature > 0) ---
+curl -s http://localhost:8213/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  "messages": [{"role":"user","content":"Write a short paragraph about the ocean."}],
+  "temperature": 0.7, "top_p": 0.95, "seed": 1,
+  "max_tokens": 256
+}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["choices"][0]["message"]["content"])'
+
+#   Log utili (con DFLASH_DS4_TIMING=1):
+#   - banner split allo startup: [deepseek4-split] auto-split: ...
+#   - timing parent: [deepseek4-split-timing]   timing Halo: [deepseek4-target-timing]
